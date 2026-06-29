@@ -1048,6 +1048,166 @@ document.getElementById('orderType').addEventListener('change', function() {
   renderSummary();
 });
 
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function buildOrderSections(name, phone, type, addr, note, deliveryFee, total) {
+  const isDelivery = type === 'delivery';
+  const itemLinesEn = [];
+  const itemLinesEs = [];
+  MENU.forEach(i => {
+    if (qty[i.id] > 0) {
+      const sub = i.price * qty[i.id];
+      itemLinesEn.push(`${i.name} × ${qty[i.id]} — $${sub} (${i.en})`);
+      itemLinesEs.push(`${i.name} × ${qty[i.id]} — $${sub} (${i.es})`);
+    }
+  });
+
+  let deliveryEn = '';
+  let deliveryEs = '';
+  if (deliveryFee > 0) {
+    deliveryEn = `Delivery fee (1 plate): $${deliveryFee}`;
+    deliveryEs = `Cargo de entrega (1 plato): $${deliveryFee}`;
+  } else if (isDelivery && countPlates() >= 2) {
+    deliveryEn = 'Delivery: FREE (2+ plates)';
+    deliveryEs = 'Entrega: GRATIS (2+ platos)';
+  }
+
+  const typeEn = isDelivery ? `DELIVERY to ${addr}` : 'PICKUP';
+  const typeEs = isDelivery ? `ENTREGA a domicilio: ${addr}` : 'RECOGER en persona';
+
+  const en = [
+    'NEW ORDER',
+    `Name: ${name}`,
+    `Phone: ${phone}`,
+    `Type: ${typeEn}`,
+    '',
+    'Items:',
+    ...itemLinesEn.map(line => `  • ${line}`),
+    deliveryEn,
+    '',
+    `Total: $${total}`,
+    note ? `Note: ${note}` : ''
+  ].filter(Boolean).join('\n');
+
+  const es = [
+    'NUEVO PEDIDO',
+    `Nombre: ${name}`,
+    `Teléfono: ${phone}`,
+    `Tipo: ${typeEs}`,
+    '',
+    'Artículos:',
+    ...itemLinesEs.map(line => `  • ${line}`),
+    deliveryEs,
+    '',
+    `Total: $${total}`,
+    note ? `Nota: ${note}` : ''
+  ].filter(Boolean).join('\n');
+
+  return { en, es, itemLinesEn, itemLinesEs, deliveryEn, deliveryEs, typeEn, typeEs };
+}
+
+function buildOrderPlain(sections) {
+  return [
+    '══════════════════════════════════════════',
+    "  CHELY'S COOKING",
+    '  Guatemalan Food · Lincoln, NE',
+    '══════════════════════════════════════════',
+    '',
+    '────────── ENGLISH ──────────',
+    sections.en,
+    '',
+    '────────── ESPAÑOL ──────────',
+    sections.es,
+    '',
+    '⚠ Do NOT collect payment until the order is confirmed by text.',
+    '⚠ NO cobrar hasta confirmar el pedido por mensaje.'
+  ].join('\n');
+}
+
+function buildOrderHtml(name, phone, sections, total, note) {
+  const itemRows = (lines) => lines.map(line =>
+    `<tr><td style="padding:8px 12px;border-bottom:1px solid #ddeeff;font-family:Georgia,'Times New Roman',serif;font-size:14px;color:#2a4a6b;">${escHtml(line)}</td></tr>`
+  ).join('');
+
+  const deliveryRow = (text) => text
+    ? `<tr><td style="padding:8px 12px;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#1a4f8a;font-weight:600;">${escHtml(text)}</td></tr>`
+    : '';
+
+  const noteBlock = note
+    ? `<div style="margin-top:12px;padding:10px 12px;background:#eef4fb;border-left:4px solid #4a90d9;border-radius:4px;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#2a4a6b;"><strong>Note / Nota:</strong> ${escHtml(note)}</div>`
+    : '';
+
+  const sectionBlock = (title, typeLabel, typeValue, itemsTitle, itemLines, deliveryText) => `
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:18px;background:#f8faff;border:1px solid #ddeeff;border-radius:8px;overflow:hidden;">
+      <tr><td style="padding:10px 14px;background:#1a4f8a;color:#ffffff;font-family:Georgia,'Times New Roman',serif;font-size:15px;font-weight:700;letter-spacing:0.5px;">${title}</td></tr>
+      <tr><td style="padding:14px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:10px;">
+          <tr><td style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#668;text-transform:uppercase;letter-spacing:1px;padding-bottom:4px;">${typeLabel}</td></tr>
+          <tr><td style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#0d1f35;font-weight:600;">${escHtml(typeValue)}</td></tr>
+        </table>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px;">
+          <tr><td style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#668;text-transform:uppercase;letter-spacing:1px;padding-bottom:6px;">${itemsTitle}</td></tr>
+          ${itemRows(itemLines)}
+          ${deliveryRow(deliveryText)}
+        </table>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            <td style="padding-top:10px;border-top:2px solid #c8a84b;font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:700;color:#1a4f8a;">Total</td>
+            <td align="right" style="padding-top:10px;border-top:2px solid #c8a84b;font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:700;color:#1a4f8a;">$${total}</td>
+          </tr>
+        </table>
+      </td></tr>
+    </table>`;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#eef4fb;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef4fb;padding:24px 12px;">
+    <tr><td align="center">
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:10px;overflow:hidden;box-shadow:0 4px 24px rgba(26,79,138,0.12);">
+        <tr>
+          <td height="6" style="background:linear-gradient(90deg,#2e7ab5 0%,#4997D0 16.666%,#4997D0 33.333%,#ffffff 33.333%,#ffffff 66.666%,#4997D0 66.666%,#4997D0 83.333%,#2e7ab5 100%);font-size:0;line-height:0;">&nbsp;</td>
+        </tr>
+        <tr><td style="padding:28px 24px 18px;background:#1a4f8a;text-align:center;">
+          <div style="font-family:Georgia,'Times New Roman',serif;font-size:28px;font-weight:700;color:#ffffff;letter-spacing:0.5px;">Chely's Cooking</div>
+          <div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#c8a84b;letter-spacing:2px;text-transform:uppercase;margin-top:6px;">Guatemalan Food · Lincoln, NE</div>
+        </td></tr>
+        <tr><td style="padding:22px 24px 8px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px;">
+            <tr>
+              <td style="font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#668;">Customer / Cliente</td>
+              <td align="right" style="font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#668;">Phone / Teléfono</td>
+            </tr>
+            <tr>
+              <td style="font-family:Georgia,'Times New Roman',serif;font-size:17px;color:#0d1f35;font-weight:700;">${escHtml(name)}</td>
+              <td align="right" style="font-family:Arial,Helvetica,sans-serif;font-size:17px;color:#2563a8;font-weight:600;">${escHtml(phone)}</td>
+            </tr>
+          </table>
+          ${sectionBlock('English', 'Order Type', sections.typeEn, 'Items', sections.itemLinesEn, sections.deliveryEn)}
+          ${sectionBlock('Español', 'Tipo de Pedido', sections.typeEs, 'Artículos', sections.itemLinesEs, sections.deliveryEs)}
+          ${noteBlock}
+          <div style="padding:12px 14px;background:#fff3cd;border:1px solid #ffc107;border-radius:7px;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#7a5000;line-height:1.5;">
+            <strong>⚠ Payment / Pago:</strong> Do NOT collect payment until the order is confirmed by text.<br>
+            <em>NO cobrar hasta confirmar el pedido por mensaje.</em>
+          </div>
+        </td></tr>
+        <tr><td style="padding:14px 24px 22px;background:#eef4fb;text-align:center;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#668;">
+          Order sent from chelyscooking.com · Pedido enviado desde chelyscooking.com
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
 function submitOrder() {
   const name  = document.getElementById('custName').value.trim();
   const phone = document.getElementById('custPhone').value.trim();
@@ -1065,24 +1225,21 @@ function submitOrder() {
 
   const deliveryFee = getDeliveryFee();
   const total = getOrderTotal();
-
-  let orderText = `NEW ORDER\nName: ${name}\nPhone: ${phone}\nType: ${type === 'delivery' ? 'DELIVERY to ' + addr : 'PICKUP'}\n\nItems:\n`;
-  MENU.forEach(i => { if (qty[i.id] > 0) orderText += `  ${i.name} x${qty[i.id]} — $${i.price * qty[i.id]}\n`; });
-  if (deliveryFee > 0) orderText += `\nDelivery fee (1 plate): $${deliveryFee}`;
-  else if (type === 'delivery' && countPlates() >= 2) orderText += `\nDelivery: FREE (2+ plates)`;
-  orderText += `\n\nTotal: $${total}`;
-  if (note) orderText += `\nNote: ${note}`;
+  const sections = buildOrderSections(name, phone, type, addr, note, deliveryFee, total);
+  const orderPlain = buildOrderPlain(sections);
+  const orderHtml = buildOrderHtml(name, phone, sections, total, note);
 
   const btn = document.getElementById('submitBtn');
   btn.disabled = true;
   btn.textContent = 'Sending... / Enviando...';
 
   const fd = new FormData();
-  fd.append('_subject', `New Order from ${name} — $${total}`);
+  fd.append('_subject', `New Order / Nuevo Pedido — ${name} — $${total}`);
   fd.append('name', name);
   fd.append('phone', phone);
-  fd.append('order_type', type === 'delivery' ? 'Delivery to: ' + addr : 'Pickup');
-  fd.append('order_details', orderText);
+  fd.append('order_type', type === 'delivery' ? `Delivery / Entrega: ${addr}` : 'Pickup / Recoger');
+  fd.append('order_details', orderPlain);
+  fd.append('order_html', orderHtml);
   fd.append('total', '$' + total);
   if (note) fd.append('special_note', note);
 
