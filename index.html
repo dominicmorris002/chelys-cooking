@@ -945,7 +945,6 @@ function switchTab(name) {
 
 
 const VENMO_USERNAME = 'ChelysCooking';
-const WEB3FORMS_ACCESS_KEY = 'YOUR_ACCESS_KEY_HERE';
 /* ============================================================================= */
 
 
@@ -1147,23 +1146,17 @@ function submitOrder() {
   btn.disabled = true;
   btn.textContent = 'Sending... / Enviando...';
 
-  const payload = {
-    access_key: WEB3FORMS_ACCESS_KEY,
-    subject: `New Order / Nuevo Pedido - ${name} - $${total}`,
-    from_name: "Chely's Cooking",
-    botcheck: '',
-    name: name,
-    phone: phone,
-    order_type: type === 'delivery' ? `Delivery / Entrega: ${addr}` : 'Pickup / Recoger',
-    order_details: orderPlain,
-    total: '$' + total
-  };
-  if (note) payload.special_note = note;
+  const fd = new FormData();
+  fd.append('_subject', `New Order / Nuevo Pedido - ${name} - $${total}`);
+  fd.append('name', name);
+  fd.append('phone', phone);
+  fd.append('order_type', type === 'delivery' ? `Delivery / Entrega: ${addr}` : 'Pickup / Recoger');
+  fd.append('order_details', orderPlain);
+  fd.append('total', '$' + total);
+  if (note) fd.append('special_note', note);
 
-  fetch('https://api.web3forms.com/submit', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-    body: JSON.stringify(payload)
+  fetch('https://formspree.io/f/mwvwgpqd', {
+    method: 'POST', body: fd, headers: { 'Accept': 'application/json' }
   }).finally(() => showSuccess(name, phone, total));
 }
 
